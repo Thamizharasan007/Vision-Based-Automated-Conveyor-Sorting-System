@@ -1,33 +1,15 @@
 /*
- ESP32 Conveyor Manual Test Sketch  (FIXED)
+ ESP32 Conveyor Manual Test Sketch
+ Check the hardware before the vision system
  Board: classic ESP32 DevKit V1 / ESP32-WROOM-32
  Libraries: ESP32Servo (install from Library Manager), ESP32 Arduino core 3.x
 
- GPIO map supplied by user:
+ GPIO map supplied:
  4 Red status LED | 5 Passive buzzer | 12 Colour button | 13 Colour LED
- 14 Servo 2 | 15 Shape button | 18 HC-SR04 TRIG | 19 HC-SR04 ECHO
+ 14 Servo 2 | 18 HC-SR04 TRIG | 19 HC-SR04 ECHO
  21 Shape LED | 22 Green status LED | 23 Yellow status LED
  25 L298N ENB | 26 L298N IN3 | 27 L298N IN4 | 32 IR OUT
- 33 Servo 1 | 34 potentiometer signal | 35 unused
-
- CHANGES vs. previous version (everything else is untouched):
- 1. Motor PWM now uses ESP32Servo's ESP32PWM class instead of raw ledcAttach(),
-    and all 4 LEDC timers are reserved first. Mixing ledcAttach() with ESP32Servo
-    lets both claim the same LEDC channel/timer, which can silently disable one
-    servo and/or the motor PWM.
- 2. Removed pinMode(OUTPUT) on the servo pins (the standalone test never did this).
- 3. Pot is mapped to MIN_MOTOR_PWM..255 (was 0..255), so the motor cannot be
-    stuck below its stall duty. Light low-pass filter added.
- 4. Ultrasonic is sampled once in loop() and cached; /status no longer fires a
-    second blocking measurement.
- 5. Servo attach results are printed at boot. Button debug prints added.
-
- IMPORTANT:
- - HC-SR04 ECHO is 5 V: use a voltage divider to keep GPIO19 at <=3.3 V.
- - GPIO12 and GPIO15 are boot-strapping pins. Do not press/hold the buttons
-   during reset/boot if it causes boot problems.
- - Use a suitable external 5 V supply for servos. Join all grounds.
- - L298N ENB jumper must be removed if GPIO25 is controlling ENB with PWM.
+ 33 Servo 1 | 34 potentiometer signal
 */
 
 #include <WiFi.h>
@@ -188,8 +170,8 @@ void doManualSort(int product) {
   motorStop();
 
   // Manual dashboard selection only. No camera/OpenCV code is active.
-  // Green -> Servo 1 at 45 degrees; Blue -> Servo 1 at 135 degrees;
-  // Orange -> Servo 2 at 45 degrees; Other -> no servo movement.
+  // Green -> Servo 1 at 90 degrees; Blue -> Servo 1 at 0 degrees;
+  // Orange -> Servo 2 at 135 degrees; Other -> no servo movement.
   switch (product) {
     case 1:
       servo1.write(90);
