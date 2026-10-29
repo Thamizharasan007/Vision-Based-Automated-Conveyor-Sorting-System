@@ -28,7 +28,7 @@ The system is being developed around three main subsystems:
 ## System Architecture
 
 ```text
-Camera
+Mobile Camera
    |
    v
 Python + OpenCV
@@ -55,7 +55,7 @@ IR Sensor --------------> ESP32
 Physical Controls ------> ESP32
 ```
 
-*Note: The diagram represents the intended integrated system. Only describe the complete camera-to-controller workflow as operational after testing the full integration.*
+*Note: The diagram represents the intended integrated system. Only describe the complete Mobile camera-to-controller workflow as operational after testing the full integration.*
 
 ## Hardware Components
 
@@ -71,7 +71,7 @@ Physical Controls ------> ESP32
 | Push button | Physical operating-mode selection |
 | LEDs | Status and mode indication |
 | Passive buzzer | Audible feedback |
-| Camera | Input for computer vision |
+| Mobile Camera | Input for computer vision using WiFi Connection |
 | Cardboard conveyor structure | Prototype conveyor frame |
 | 3D-printed motor bracket | Motor mounting |
 | 3D-printed roller coupler | Motor-to-roller coupling |
@@ -162,7 +162,7 @@ Test results will be documented with observations, expected behaviour, actual be
 ## Current Limitations
 
 - The prototype uses a cardboard conveyor structure.
-- Camera-based classification and ESP32 sorting control must be validated as an integrated system.
+- Mobile Camera-based classification and ESP32 sorting control must be validated as an integrated system.
 - Classification accuracy depends on lighting, camera position, object appearance, and the image-processing configuration.
 - Mechanical performance depends on conveyor alignment, motor torque, belt friction, and object positioning.
 
@@ -179,7 +179,7 @@ Test results will be documented with observations, expected behaviour, actual be
 
 **Thamizharasan**
 
-Mechanical and Automation Engineering
+B.E.Mechanical and Automation Engineering
 
 ## License
 
