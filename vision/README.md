@@ -56,6 +56,18 @@ The camera address may differ between networks. Keep local-only configuration ou
 - Add serial communication with the ESP32.
 - Test classification accuracy and complete sorting cycles.
 
+## Camera Input — Mobile Phone IP Camera
+
+The system uses a mobile phone as an IP camera to provide a live video stream to the computer over a local Wi-Fi network.
+
+- **Video stream URL:** `http://192.168.1.4:8080/video`
+- **Computer vision:** Python and OpenCV capture and process the live frames.
+- **Detection:** The vision module identifies object colours and is being extended for shape classification.
+- **Network requirement:** The phone and computer should be connected to the same local network, and the IP camera application must be running.
+
+The IP address may change when the network or phone configuration changes. Update the camera URL in the configuration before running the program.
+
+
 ## Notes
 
 The vision module and ESP32 firmware are separate parts of the system. Do not consider the complete vision-to-controller workflow operational until communication and physical sorting have been tested together.
