@@ -1,11 +1,10 @@
 import cv2
 import numpy as np
+from camera_config import CAMERA_URL
 
 # ==================================================
 # 1. CONFIGURATION — EDIT THESE VALUES IF NEEDED
 # ==================================================
-
-CAMERA_URL = "http://192.168.1.4:8080/video"
 
 MIN_CONTOUR_AREA = 2500
 CANNY_LOW = 50
