@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from camera_config import CAMERA_URL
 
 # ==================================================
 # 1. COLOUR CONFIGURATION — EDIT THIS SECTION
@@ -36,9 +37,6 @@ ACTIVE_COLORS = ["GREEN", "BLUE", "ORANGE", "YELLOW"]
 
 # Minimum number of matching pixels required for detection
 MIN_PIXELS = 5000
-
-# Camera stream URL
-CAMERA_URL = "http://192.168.1.4:8080/video"
 
 
 # ==================================================
