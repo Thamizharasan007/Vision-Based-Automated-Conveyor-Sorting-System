@@ -1,21 +1,30 @@
+```python
 import cv2
 import numpy as np
+
 from camera_config import CAMERA_URL
+from utils import open_camera, draw_label
+
 
 # ==================================================
-# 1. CONFIGURATION — EDIT THESE VALUES IF NEEDED
+# 1. CONFIGURATION — CHANGE THESE VALUES IF NEEDED
 # ==================================================
 
 MIN_CONTOUR_AREA = 2500
+
 CANNY_LOW = 50
 CANNY_HIGH = 150
+
 APPROX_EPSILON = 0.04
+
 
 # ==================================================
 # 2. SHAPE CLASSIFICATION
 # ==================================================
 
 def detect_shape(contour):
+    """Classify a contour as a basic geometric shape."""
+
     perimeter = cv2.arcLength(contour, True)
 
     if perimeter == 0:
@@ -39,35 +48,33 @@ def detect_shape(contour):
 
         if 0.90 <= ratio <= 1.10:
             return "SQUARE"
-        else:
-            return "RECTANGLE"
+
+        return "RECTANGLE"
 
     else:
         area = cv2.contourArea(contour)
 
-        circularity = (4 * np.pi * area) / (perimeter * perimeter)
+        circularity = (
+            4 * np.pi * area
+        ) / (perimeter * perimeter)
 
         if circularity > 0.75:
             return "CIRCLE"
-        else:
-            return "OTHER"
+
+        return "OTHER"
 
 
 # ==================================================
 # 3. OPEN MOBILE PHONE IP CAMERA
 # ==================================================
 
-capture = cv2.VideoCapture(CAMERA_URL)
+capture = open_camera(CAMERA_URL)
 
-if not capture.isOpened():
-    raise RuntimeError(
-        "Camera could not be opened. Check CAMERA_URL "
-        "and ensure the phone camera stream is running."
-    )
+print("Shape detection started. Press 'q' to exit.")
 
 
 # ==================================================
-# 4. PROCESS LIVE VIDEO
+# 4. LIVE SHAPE DETECTION
 # ==================================================
 
 try:
@@ -78,24 +85,31 @@ try:
             print("Failed to read camera frame.")
             break
 
-        # Reduce image noise
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Convert the image to grayscale
+        gray = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2GRAY
+        )
 
+        # Reduce noise
         blurred = cv2.GaussianBlur(
             gray,
             (5, 5),
             0
         )
 
-        # Find object edges
+        # Detect edges
         edges = cv2.Canny(
             blurred,
             CANNY_LOW,
             CANNY_HIGH
         )
 
-        # Join small gaps in edges
-        kernel = np.ones((3, 3), dtype=np.uint8)
+        # Close small gaps in object edges
+        kernel = np.ones(
+            (3, 3),
+            dtype=np.uint8
+        )
 
         edges = cv2.morphologyEx(
             edges,
@@ -103,27 +117,32 @@ try:
             kernel
         )
 
-        # Extract external contours
+        # Find external contours
         contours, _ = cv2.findContours(
             edges,
             cv2.RETR_EXTERNAL,
             cv2.CHAIN_APPROX_SIMPLE
         )
 
+        detected_shapes = []
+
         for contour in contours:
 
             area = cv2.contourArea(contour)
 
-            # Ignore small contours and background noise
+            # Ignore small contours
             if area < MIN_CONTOUR_AREA:
                 continue
 
             shape = detect_shape(contour)
+            detected_shapes.append(shape)
 
             # Find object position
-            x, y, width, height = cv2.boundingRect(contour)
+            x, y, width, height = cv2.boundingRect(
+                contour
+            )
 
-            # Draw contour and bounding box
+            # Draw the contour and bounding box
             cv2.drawContours(
                 frame,
                 [contour],
@@ -140,24 +159,37 @@ try:
                 2
             )
 
-            # Display detected shape
-            cv2.putText(
+            # Display shape and contour area
+            draw_label(
                 frame,
-                shape,
-                (x, max(y - 10, 25)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 255),
-                2
+                f"{shape} | Area: {int(area)}",
+                position=(x, max(y - 10, 25)),
+                color=(0, 255, 255),
+                font_scale=0.6
             )
 
-            print(
-                f"Shape: {shape} | "
-                f"Area: {int(area)} pixels"
-            )
+        # Display the current result
+        if detected_shapes:
+            status = ", ".join(detected_shapes)
+        else:
+            status = "NO SHAPE DETECTED"
 
-        cv2.imshow("Shape Detection", frame)
-        cv2.imshow("Detected Edges", edges)
+        draw_label(
+            frame,
+            f"Detected: {status}",
+            position=(20, 40),
+            color=(255, 255, 255)
+        )
+
+        cv2.imshow(
+            "Mobile IP Camera - Shape Detection",
+            frame
+        )
+
+        cv2.imshow(
+            "Detected Edges",
+            edges
+        )
 
         # Press q to quit
         if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -166,3 +198,5 @@ try:
 finally:
     capture.release()
     cv2.destroyAllWindows()
+    print("Shape detection stopped.")
+```
