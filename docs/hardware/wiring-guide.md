@@ -18,7 +18,7 @@ A mobile phone camera streams live video to a computer running Python and OpenCV
 - Two servo motors
 - Potentiometer
 - One physical pushbutton
-- Four green LEDs
+- Three green LEDs
 - One yellow LED
 - One red LED
 - Passive buzzer
