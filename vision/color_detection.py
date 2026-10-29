@@ -1,9 +1,17 @@
 import cv2
 import numpy as np
+
 from camera_config import CAMERA_URL
+from utils import (
+    open_camera,
+    convert_to_hsv,
+    create_color_mask,
+    classify_dominant_color,
+    draw_label,
+)
 
 # ==================================================
-# 1. COLOUR CONFIGURATION — EDIT THIS SECTION
+# 1. COLOUR CONFIGURATION
 # ==================================================
 
 COLOR_RANGES = {
@@ -23,36 +31,28 @@ COLOR_RANGES = {
         (np.array([20, 100, 100]), np.array([30, 255, 255]))
     ],
 
-    # Red needs two ranges because its HSV hue
-    # wraps around the beginning and end of the scale.
+    # Red needs two HSV ranges.
     "RED": [
         (np.array([0, 100, 100]), np.array([10, 255, 255])),
         (np.array([170, 100, 100]), np.array([179, 255, 255]))
-    ]
+    ],
 }
 
-# Choose the FOUR colours to detect.
-# Replace "BLUE" with "RED" when needed.
+# Select the four colours to detect.
 ACTIVE_COLORS = ["GREEN", "BLUE", "ORANGE", "YELLOW"]
 
-# Minimum number of matching pixels required for detection
+# Minimum matching pixels required for detection
 MIN_PIXELS = 5000
 
 
 # ==================================================
-# 2. OPEN CAMERA
+# 2. OPEN MOBILE PHONE IP CAMERA
 # ==================================================
 
-capture = cv2.VideoCapture(CAMERA_URL)
-
-if not capture.isOpened():
-    raise RuntimeError(
-        "Camera could not be opened. Check the camera URL "
-        "and make sure the phone and computer are connected."
-    )
-
+capture = open_camera(CAMERA_URL)
 last_color = None
 
+print("Colour detection started. Press 'q' to exit.")
 
 # ==================================================
 # 3. MAIN DETECTION LOOP
@@ -66,36 +66,25 @@ try:
             print("Failed to read camera frame.")
             break
 
-        # Convert BGR image to HSV colour space
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        # Convert the frame from BGR to HSV
+        hsv = convert_to_hsv(frame)
 
+        # Count matching pixels for every active colour
         pixel_counts = {}
 
-        # Detect each active colour
         for color in ACTIVE_COLORS:
-            combined_mask = np.zeros(
-                hsv.shape[:2], dtype=np.uint8
+            mask = create_color_mask(
+                hsv,
+                COLOR_RANGES[color]
             )
 
-            # Some colours, such as red, need multiple HSV ranges
-            for lower, upper in COLOR_RANGES[color]:
-                mask = cv2.inRange(hsv, lower, upper)
-                combined_mask = cv2.bitwise_or(
-                    combined_mask, mask
-                )
+            pixel_counts[color] = cv2.countNonZero(mask)
 
-            pixel_counts[color] = cv2.countNonZero(
-                combined_mask
-            )
-
-        # Find the colour with the highest pixel count
-        detected_color = max(
-            pixel_counts, key=pixel_counts.get
+        # Identify the colour with the highest pixel count
+        detected_color = classify_dominant_color(
+            pixel_counts,
+            MIN_PIXELS
         )
-
-        # Reject detections below the pixel threshold
-        if pixel_counts[detected_color] < MIN_PIXELS:
-            detected_color = "UNKNOWN"
 
         # Print only when the detected colour changes
         if detected_color != last_color:
@@ -103,23 +92,20 @@ try:
             print("Pixel counts:", pixel_counts)
             last_color = detected_color
 
-        # Show the detection result on the video
-        cv2.putText(
+        # Display the detected colour on the video
+        draw_label(
             frame,
             f"Colour: {detected_color}",
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (255, 255, 255),
-            2
+            position=(20, 40)
         )
 
-        cv2.imshow("Colour Detection", frame)
+        cv2.imshow("Mobile IP Camera - Colour Detection", frame)
 
-        # Press q to exit
+        # Press q to quit
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
 finally:
     capture.release()
     cv2.destroyAllWindows()
+    print("Colour detection stopped.")
