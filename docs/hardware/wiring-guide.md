@@ -170,3 +170,12 @@ Before powering the complete system:
 ## 12. Testing Status
 
 This document describes the intended wiring configuration. Confirm each connection against the actual prototype before treating this guide as a validated assembly procedure.
+
+## Circuit Diagram
+
+The circuit diagram illustrates the ESP32-based conveyor sorting system, including the ultrasonic and IR sensors, motor driver, DC motor, two servo motors, potentiometer, pushbutton, indicator LEDs and buzzer.
+
+![Circuit diagram of the vision-based conveyor sorting system](../diagrams/Circuit-Diagram.svg)
+
+**Important:** Verify the actual wiring and power connections against the assembled hardware before powering the system. The mobile-phone camera used for computer-vision processing communicates with the computer separately and is not part of this electrical circuit.
+
