@@ -14,10 +14,9 @@ The computer vision application runs separately on a computer using Python and O
 |---|---:|---|
 | Red status LED | GPIO 4 | Red status indication |
 | Passive buzzer | GPIO 5 | Audible feedback |
-| Colour-mode button | GPIO 12 | Physical mode selection |
+|Mode-selection button | GPIO 12 | Single press selects colour mode; double press selects shape mode|
 | Colour-mode LED | GPIO 13 | Colour-mode indication |
 | Servo 2 | GPIO 14 | Sorting mechanism actuation |
-| Shape-mode button | GPIO 15 | Physical mode selection |
 | Ultrasonic TRIG | GPIO 18 | Ultrasonic trigger signal |
 | Ultrasonic ECHO | GPIO 19 | Ultrasonic echo input |
 | Shape-mode LED | GPIO 21 | Shape-mode indication |
@@ -70,14 +69,21 @@ Do not power high-current servos directly from an ESP32 GPIO pin.
 
 ## 6. Physical Controls
 
-- GPIO 12 is assigned to the colour-mode button.
-- GPIO 15 is assigned to the shape-mode button.
-- GPIO 34 reads the potentiometer signal for conveyor speed adjustment.
+The system uses a single physical pushbutton connected to GPIO 12 to select between colour and shape detection modes.
 
-GPIO 12 and GPIO 15 are ESP32 strapping pins. Their electrical levels during startup can affect boot behaviour. If startup problems occur, consider moving the buttons to suitable non-strapping GPIO pins.
+| User action | Operation |
+|---|---|
+| Single press | Select colour detection mode |
+| Double press | Select shape detection mode |
 
-GPIO 34 is input-only and does not support an internal pull-up or pull-down resistor.
+- GPIO 12: Mode-selection button input.
+- GPIO 13: Colour-mode status LED.
+- GPIO 21: Shape-mode status LED.
+- GPIO 34: Potentiometer input for conveyor speed adjustment.
 
+The firmware uses button debouncing and a double-click detection interval to distinguish a single press from a double press. The selected mode is indicated by the corresponding mode LED.
+
+**Hardware note:** GPIO 12 is an ESP32 strapping pin. Its electrical level during startup can affect boot behaviour, so verify reliable startup with the button circuit connected.
 ## 7. Computer Vision Connection
 
 The mobile phone camera streams video to the computer running Python and OpenCV.
