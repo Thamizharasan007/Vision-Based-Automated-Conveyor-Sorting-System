@@ -1,0 +1,72 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python packaging and build files
+build/
+dist/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Arduino IDE build artifacts
+build/
+*.elf
+*.hex
+*.bin
+*.map
+*.sym
+
+# PlatformIO build artifacts
+.pio/
+
+# Compiled ESP32 firmware
+firmware.bin
+partitions.bin
+bootloader.bin
+
+# Generated test outputs
+test_output/
+output/
+debug_output/
+
+# Large temporary video files
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Python coverage reports
+.coverage
+htmlcov/
+
+# Local camera configuration
+camera_local.py
