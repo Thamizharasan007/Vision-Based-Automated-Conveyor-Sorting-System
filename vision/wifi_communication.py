@@ -190,3 +190,99 @@ def collect_classification(mode: str) -> str:
                     0.75,
                     (0, 255, 0),
                     2,
+                    cv2.LINE_AA,
+                )
+                cv2.imshow(window_name, preview)
+                cv2.waitKey(1)
+
+            time.sleep(FRAME_INTERVAL_SECONDS)
+    finally:
+        cap.release()
+        if SHOW_PREVIEW:
+            try:
+                cv2.destroyWindow(window_name)
+                cv2.waitKey(1)
+            except cv2.error:
+                pass
+
+    valid_votes = [vote for vote in votes if vote != "UNKNOWN"]
+    if not valid_votes:
+        return "UNKNOWN"
+
+    counts = Counter(valid_votes)
+    result, number_of_votes = counts.most_common(1)[0]
+    if number_of_votes < MIN_VALID_VOTES:
+        print(f"[VISION] Weak/noisy detection: {dict(counts)} -> UNKNOWN")
+        return "UNKNOWN"
+
+    print(f"[VISION] Votes: {dict(counts)} -> {result}")
+    return result
+
+
+def main() -> None:
+    print("ESP32-triggered conveyor vision controller")
+    print(f"ESP32: {ESP32_BASE_URL}")
+    print("Waiting for an IR-triggered vision request...\n")
+
+    last_seen_request_id: Optional[int] = None
+
+    while True:
+        try:
+            request_data = http_get_json("/vision-request")
+            active = bool(request_data.get("active", False))
+            request_id = int(request_data.get("requestId", 0))
+            mode = str(request_data.get("mode", "")).strip().upper()
+
+            if not active:
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
+
+            if request_id == last_seen_request_id:
+                # Avoid running the same request repeatedly if the ESP32 has
+                # not yet changed state after a response or network delay.
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
+
+            if mode not in {"COLOUR", "SHAPE"}:
+                print(f"[ERROR] ESP32 sent an unknown mode: {mode!r}")
+                time.sleep(1.0)
+                continue
+
+            print(f"\n[REQUEST] ID={request_id} | selected mode={mode}")
+            result = collect_classification(mode)
+            print(f"[RESULT] {result}; sending to ESP32...")
+
+            try:
+                response_text = submit_result(request_id, mode, result)
+                print(f"[ESP32] {response_text}")
+                last_seen_request_id = request_id
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                if exc.code == 409:
+                    # A 409 may mean the ESP32 has already accepted this
+                    # request (for example, if the reply was lost).
+                    print(f"[ESP32] Request no longer active: {detail}")
+                    last_seen_request_id = request_id
+                else:
+                    print(f"[HTTP ERROR] {exc.code}: {detail}")
+                    time.sleep(1.0)
+            except (urllib.error.URLError, TimeoutError) as exc:
+                print(f"[NETWORK ERROR] Could not submit result: {exc}")
+                time.sleep(1.0)
+
+        except CameraUnavailable as exc:
+            # Do not submit a false UNKNOWN result just because the camera is
+            # unreachable. The ESP32 stays safely stopped awaiting a result.
+            print(f"[CAMERA ERROR] {exc}")
+            time.sleep(2.0)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            print(f"[ESP32 CONNECTION ERROR] {exc}")
+            time.sleep(2.0)
+        except KeyboardInterrupt:
+            print("\nStopping vision controller.")
+            break
+        except Exception as exc:
+            print(f"[ERROR] {type(exc).__name__}: {exc}")
+            time.sleep(1.0)
+
+    cv2.destroyAllWindows()
