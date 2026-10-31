@@ -28,7 +28,7 @@ ESP32_BASE_URL = "http://192.168.4.1"
 # IMPORTANT: when the phone joins the ESP32's Sorting-Conveyor Wi-Fi,
 # its camera-stream IP may change. Update this URL to the address shown by
 # your phone IP-camera app. Do not assume the old 192.168.1.4 address remains.
-CAMERA_URL = "http://192.168.1.4:8080/video"
+CAMERA_URL = "http://192.168.4.2:8080/video"
 
 POLL_INTERVAL_SECONDS = 0.25
 HTTP_TIMEOUT_SECONDS = 3.0
@@ -115,47 +115,113 @@ def classify_colour(frame: np.ndarray) -> str:
     return best_colour
 
 
-def classify_shape(frame: np.ndarray) -> str:
+def analyze_shape(frame: np.ndarray):
+    """Find the main foreground contour and classify its geometry.
+
+    Uses Otsu thresholding in both polarities instead of relying only on Canny
+    edge contours. This is generally more reliable for solid objects placed on
+    a contrasting conveyor background.
+
+    Returns (label, annotated_frame, selected_binary_mask, diagnostic_text).
+    """
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, 50, 150)
-    kernel = np.ones((3, 3), dtype=np.uint8)
-    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    frame_h, frame_w = gray.shape[:2]
+    frame_area = float(frame_h * frame_w)
+    min_area = max(float(MIN_CONTOUR_AREA), frame_area * 0.003)
+    max_area = frame_area * 0.65
 
-    contours, _ = cv2.findContours(
-        edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    kernel = np.ones((5, 5), dtype=np.uint8)
+    candidates = []
+    masks = []
+
+    # Try both bright-object and dark-object foreground polarity.
+    for threshold_type in (cv2.THRESH_BINARY, cv2.THRESH_BINARY_INV):
+        _, mask = cv2.threshold(
+            blurred, 0, 255, threshold_type + cv2.THRESH_OTSU
+        )
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        masks.append(mask)
+
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area < min_area or area > max_area:
+                continue
+
+            x, y, w, h = cv2.boundingRect(contour)
+            # Ignore objects touching the image boundary: these are often
+            # conveyor/background regions rather than the item being sorted.
+            margin = 2
+            if x <= margin or y <= margin or x + w >= frame_w - margin or y + h >= frame_h - margin:
+                continue
+
+            perimeter = cv2.arcLength(contour, True)
+            if perimeter <= 0:
+                continue
+
+            approximation = cv2.approxPolyDP(contour, 0.025 * perimeter, True)
+            corners = len(approximation)
+            circularity = (4.0 * np.pi * area) / (perimeter * perimeter)
+
+            if corners == 3:
+                label = "TRIANGLE"
+                ratio = 0.0
+            elif corners == 4:
+                rect = cv2.minAreaRect(contour)
+                side_a, side_b = rect[1]
+                if min(side_a, side_b) <= 0:
+                    continue
+                ratio = max(side_a, side_b) / min(side_a, side_b)
+                label = "SQUARE" if ratio <= 1.15 else "RECTANGLE"
+            elif circularity >= 0.75:
+                label = "CIRCLE"
+                ratio = 0.0
+            elif corners >= 5:
+                label = "OTHER"
+                ratio = 0.0
+            else:
+                label = "UNKNOWN"
+                ratio = 0.0
+
+            candidates.append({
+                "area": area,
+                "contour": contour,
+                "label": label,
+                "corners": corners,
+                "circularity": circularity,
+                "ratio": ratio,
+                "mask": mask,
+            })
+
+    annotated = frame.copy()
+    if not candidates:
+        return "UNKNOWN", annotated, np.zeros_like(gray), "no suitable foreground contour"
+
+    # The largest non-border foreground object is assumed to be the item on
+    # the conveyor. If the camera sees several objects, keep only the largest.
+    best = max(candidates, key=lambda item: item["area"])
+    cv2.drawContours(annotated, [best["contour"]], -1, (0, 255, 0), 3)
+    x, y, w, h = cv2.boundingRect(best["contour"])
+    cv2.rectangle(annotated, (x, y), (x + w, y + h), (255, 180, 0), 2)
+    diagnostic = (
+        f"area={best['area']:.0f}, corners={best['corners']}, "
+        f"circularity={best['circularity']:.2f}, ratio={best['ratio']:.2f}"
     )
-    if not contours:
-        return "UNKNOWN"
+    cv2.putText(
+        annotated, f"{best['label']} | {diagnostic}", (12, 28),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2, cv2.LINE_AA
+    )
+    return best["label"], annotated, best["mask"], diagnostic
 
-    contour = max(contours, key=cv2.contourArea)
-    area = cv2.contourArea(contour)
-    if area < MIN_CONTOUR_AREA:
-        return "UNKNOWN"
 
-    perimeter = cv2.arcLength(contour, True)
-    if perimeter <= 0:
-        return "UNKNOWN"
-
-    approximation = cv2.approxPolyDP(contour, 0.04 * perimeter, True)
-    corners = len(approximation)
-
-    if corners == 3:
-        return "TRIANGLE"
-
-    if corners == 4:
-        x, y, width, height = cv2.boundingRect(approximation)
-        if height == 0:
-            return "UNKNOWN"
-        aspect_ratio = width / float(height)
-        return "SQUARE" if 0.85 <= aspect_ratio <= 1.15 else "RECTANGLE"
-
-    circularity = (4.0 * np.pi * area) / (perimeter * perimeter)
-    if corners >= 5 and circularity >= 0.75:
-        return "CIRCLE"
-    if corners >= 5:
-        return "OTHER"
-    return "UNKNOWN"
+def classify_shape(frame: np.ndarray) -> str:
+    """Compatibility wrapper for shape-only callers."""
+    label, _annotated, _mask, _diagnostic = analyze_shape(frame)
+    return label
 
 
 def collect_classification(mode: str) -> str:
@@ -171,17 +237,20 @@ def collect_classification(mode: str) -> str:
                 time.sleep(FRAME_INTERVAL_SECONDS)
                 continue
 
+            shape_preview = None
+            shape_mask = None
             if mode == "COLOUR":
                 label = classify_colour(frame)
             elif mode == "SHAPE":
-                label = classify_shape(frame)
+                label, shape_preview, shape_mask, diagnostic = analyze_shape(frame)
+                print(f"[SHAPE] Frame {frame_index + 1}: {label} ({diagnostic})")
             else:
                 raise ValueError(f"Unsupported ESP32 mode: {mode}")
 
             votes.append(label)
 
             if SHOW_PREVIEW:
-                preview = frame.copy()
+                preview = shape_preview if mode == "SHAPE" else frame.copy()
                 cv2.putText(
                     preview,
                     f"{mode}: {label} ({frame_index + 1}/{FRAME_COUNT})",
@@ -193,6 +262,8 @@ def collect_classification(mode: str) -> str:
                     cv2.LINE_AA,
                 )
                 cv2.imshow(window_name, preview)
+                if mode == "SHAPE" and shape_mask is not None:
+                    cv2.imshow("Shape threshold mask", shape_mask)
                 cv2.waitKey(1)
 
             time.sleep(FRAME_INTERVAL_SECONDS)
@@ -201,6 +272,8 @@ def collect_classification(mode: str) -> str:
         if SHOW_PREVIEW:
             try:
                 cv2.destroyWindow(window_name)
+                if mode == "SHAPE":
+                    cv2.destroyWindow("Shape threshold mask")
                 cv2.waitKey(1)
             except cv2.error:
                 pass
@@ -286,3 +359,7 @@ def main() -> None:
             time.sleep(1.0)
 
     cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
